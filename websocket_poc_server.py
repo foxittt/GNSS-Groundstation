@@ -31,6 +31,7 @@ async def server(websocket, path):
     try:
         async for message in websocket:
             print(f">{message}")
+            await websocket.send("OK")
     finally:
         await unregister(websocket)
 
