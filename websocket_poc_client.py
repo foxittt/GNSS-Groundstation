@@ -60,12 +60,12 @@ async def listen_forever():
         connection = websockets.connect("ws://localhost:5678")
         try:
             SERVER = await asyncio.wait_for(connection, 5)
-        except TimeoutError:
-            print("Connection timeout:")
-            await asyncio.sleep(5)
-            continue
         except (OSError, websockets.exceptions.InvalidMessage) as e:
             print("Connection unsuccessful:", e)
+            await asyncio.sleep(5)
+            continue
+        except:
+            print("Connection timeout:")
             await asyncio.sleep(5)
             continue
 
