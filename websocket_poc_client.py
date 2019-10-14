@@ -1,3 +1,12 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Author: 
+Marcus Voß (m.voss@laposte.net)
+
+Description:
+POC websocket client that automatically reconnects and should prevent message loss.
+"""
 
 
 import asyncio

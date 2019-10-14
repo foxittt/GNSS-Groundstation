@@ -26,7 +26,7 @@ from datetime import datetime
      
 # Open the serial port
 #ser = serial.Serial('/dev/ttyACM0', 460800)  # open serial port
-ser = serial.Serial('COM8', 9600)  # open serial port
+ser = serial.Serial('COM6', 115200)  # open serial port
 	
 # Get a datetime object containing current date and time
 now = datetime.now()
@@ -88,6 +88,7 @@ time.sleep(1)
 # Turn on the raw messages
 
 # Measurements
+#Class 6 ID 8A (CFG-VALSET) Length 9 Payload 0x209102a5 (rawx on UART1)
 msg_enable_rawx = b'\xB5\x62\x06\x8A\x09\x00\x00\x01\x00\x00\xA7\x02\x91\x20\x01'
 msg_enable_rawx = compute_checksum(msg_enable_rawx,len(msg_enable_rawx)) 
 ser.write(msg_enable_rawx)
