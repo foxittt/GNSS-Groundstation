@@ -207,11 +207,16 @@ class UBX_receiver:
             vals.append(ubx_config_dict[arg])
             vals.append(b'\x01')
         self.set_val(*vals)
+    
+    def ubx_config_enable_all(self):
+        '''disable all messages defined in config'''
+        self.ubx_config_enable(*list(ubx_config_dict.keys()))
 
 
 class UBX_message:
     correct = False
     sync = b'\xB5\x62'
+    raw_data = None
     cl = None
     id = None
     length = None
@@ -219,8 +224,8 @@ class UBX_message:
     checksum = None
 
     def __init__(self, data):
-        msg = self.sync+bytes(data)
-        checksum = fletcher_checksum(msg[:-2])
+        self.raw_data = self.sync+bytes(data)
+        checksum = fletcher_checksum(self.raw_data[:-2])
         if checksum != data[-2:]:
             raise ValueError(
                 f"wrong checksum {list(checksum)} is not {list(data[-2:])}")
@@ -244,19 +249,18 @@ class UBX_message:
 class NMEA_message:
     correct = False
     data = None
-    msg = None
+    raw_data = None
     talker_id = None
     msg_type = None
     checksum = None
 
     def __init__(self, data):
         data = data.decode()
-        self.msg = data
+        self.raw_data = data
         self.talker_id = data[:2]
         self.msg_type = data[2:5]
         self.data = data[6:-5]
         nmea_data, chk = data.split('*')
-        print(f"nmea: {nmea_data}")
         checksum = 0
         for s in nmea_data:  # NMEA checksum is XOR sum of all characters between $ and *
             checksum ^= ord(s)

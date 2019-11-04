@@ -11,9 +11,11 @@ POC websocket client that automatically reconnects and should prevent message lo
 
 import asyncio
 import websockets
-import datetime
+import itertools
+#import datetime
+import time
 import json
-import sys
+#import sys
 
 from collections import deque
 from ubx_receiver import UBX_receiver, UBX_message, NMEA_message
@@ -25,6 +27,7 @@ SERIAL_PORT = "COM5"
 BAUDRATE = 115200
 WEBSOCKET_ADDRESS = "ws://localhost:5678"
 
+msgID = itertools.count()
 
 def handle_msg(msg):
     """prints out the received message"""
@@ -32,29 +35,48 @@ def handle_msg(msg):
 
 
 async def gather_data():
+    global msgID
     receiver = UBX_receiver(SERIAL_PORT, BAUDRATE)
     try:
         print("Starting to listen for UBX packets")
         receiver.ubx_config_disable_all()
+        # receiver.ubx_config_enable_all()
         # receiver.ubx_config_enable("RAWX_UART1","SFRBX_UART1")
-        receiver.ubx_config_enable("GGA_UART1")
+        receiver.ubx_config_enable("GGA_UART1", "RAWX_UART1")
         while True:
             try:
                 msg = receiver.parse()
                 if (isinstance(msg, str)):
                     print(f"error: {msg}")
                 elif (isinstance(msg, UBX_message)):
-                    print(msg)
-                    DATA.append(str(msg))
+                    constructed_message = {
+                        "msgID": next(msgID),
+                        "type": "GNSS",
+                        "protocol": "UBX",
+                        "timestamp": time.time(),
+                        "class": msg.cl,
+                        "id": msg.id,
+                        "payload": list(msg.payload),
+                        "raw": list(msg.raw_data)
+                    }
+                    DATA.append(constructed_message)
                 elif (isinstance(msg, NMEA_message)):
-                    print(msg)
-                    DATA.append(str(msg))
+                    constructed_message = {
+                        "msgID": next(msgID),
+                        "type": "GNSS",
+                        "protocol": "NMEA",
+                        "timestamp": time.time(),
+                        "talker": msg.talker_id+msg.msg_type,
+                        "data": msg.data,
+                        "raw": msg.raw_data
+                    }
+                    DATA.append(constructed_message)
             except (ValueError, IOError) as err:
                 print(err)
             await asyncio.sleep(0)
 
     finally:
-        del receiver #clean up serial connection
+        del receiver  # clean up serial connection
 
 
 async def gather_placeholder_data():
@@ -65,27 +87,26 @@ async def gather_placeholder_data():
         now = str(counter)
         DATA.append(now)
         print(f"length: {len(DATA)}")
-        print(f"size: {sys.getsizeof(DATA)}")
         await asyncio.sleep(1)
 
 
-async def send_data():
-    global SERVER
-    print("starting task: send_data")
-    while True:
-        if len(DATA) > 0 and SERVER != None:
-            msg = DATA[0]  # get leftmost item
-            try:
-                print(f"< {msg}")
-                await SERVER.send(msg)
-                print("send")
-                answ = await SERVER.recv()
-                print(f"> {answ}")
-                DATA.popleft()
-            except:
-                print("message failed!")
-                SERVER = None
-        await asyncio.sleep(0)
+# async def send_data():
+#     global SERVER
+#     print("starting task: send_data")
+#     while True:
+#         if len(DATA) > 0 and SERVER != None:
+#             msg = DATA[0]  # get leftmost item
+#             try:
+#                 print(f"< {msg}")
+#                 await SERVER.send(msg)
+#                 print("send")
+#                 answ = await SERVER.recv()
+#                 print(f"> {answ}")
+#                 DATA.popleft()
+#             except:
+#                 print("message failed!")
+#                 SERVER = None
+#         await asyncio.sleep(0)
 
 
 async def listen_forever():
@@ -96,6 +117,7 @@ async def listen_forever():
     global SERVER
     print("starting task: listen_forever")
     while True:
+        print(f"queque length: {len(DATA)}")
         # outer loop restarted every time the connection fails
         SERVER = None
         print("Connecting to websocket server...")
@@ -116,8 +138,9 @@ async def listen_forever():
             # listener loop
             if len(DATA) > 0 and SERVER != None:
                 try:
-                    msg = DATA[0]  # get leftmost item
-                    print(f"< {msg}")
+                    print(f"queque length: {len(DATA)}")
+                    msg = json.dumps(DATA[0])  # get leftmost item
+                    #print(f"< {msg}")
                     await SERVER.send(msg)
                     answ = await SERVER.recv()
                     print(f"> {answ}")

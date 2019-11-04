@@ -10,6 +10,7 @@ POC websocket server that prints every message it receives.
 
 import asyncio
 import websockets
+import json
 
 CLIENTS = set()
 WEBSOCKET_IP = "localhost"#"10.0.20.227"
@@ -32,11 +33,13 @@ async def server(websocket, path):
     await register(websocket)
     try:
         async for message in websocket:
+            msg = json.loads(message)
             print(f">{message}")
-            await websocket.send("OK")
+            msgID = msg.get("msgID")
+            await websocket.send(f"OK {msgID}")
     finally:
         await unregister(websocket)
-
+print("waiting for clients...")
 start_server = websockets.serve(server, WEBSOCKET_IP, WEBSOCKET_PORT)
 
 asyncio.get_event_loop().run_until_complete(start_server)
