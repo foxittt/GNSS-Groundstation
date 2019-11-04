@@ -13,7 +13,7 @@ class ubx_config_helper:
     @staticmethod
     def compute_checksum(msg):
         '''8-Bit Fletcher Algorithm modelled after ublox documentation. Returns checksum'''
-        print(f"computing checksum of {msg}")
+        #print(f"computing checksum of {msg}")
         CK_A = CK_B = 0
         # start at class (byte 2)
         for i in range(2, len(msg)):
@@ -25,8 +25,8 @@ class ubx_config_helper:
         # convert to bytes
         CK_A = bytes([CK_A])
         CK_B = bytes([CK_B])
-        print("CK_A", CK_A)
-        print("CK_B", CK_B)
+        #print("CK_A", CK_A)
+        #print("CK_B", CK_B)
         return CK_A+CK_B
 
     def ubx_msg(self, c, id, payload):
@@ -83,25 +83,85 @@ class ubx_parser:
     last_byte = None
     parse_mode = None
     ubx_length = None
+    ubx_msg_dict = {
+        # lookup table for ubx messages
+        b"\x01": {
+            "classname": "NAV",
+
+        },
+        b"\x02": {
+            "classname": "RXM",
+            b"\x14": "MEASX",
+            b"\x41": "PMREQ",
+            b"\x15": "RAWX",
+            b"\x59": "RLM",
+            b"\x13": "SFRBX"
+        },
+        b"\x04": {
+            "classname": "INF",
+
+        },
+        b"\x05":  {
+            "classname": "ACK",
+            b"\x00": "NAK",
+            b"\x01": "ACK"
+        },
+        b"\x06":  {
+            "classname": "CFG",
+
+        },
+        b"\x09":  {
+            "classname": "UPD",
+
+        },
+        b"\x0A":  {
+            "classname": "MON",
+
+        },
+        b"\x0D":  {
+            "classname": "TIM",
+
+        },
+        b"\x13":  {
+            "classname": "MGA",
+
+        },
+        b"\x21":  {
+            "classname": "LOG",
+
+        },
+        b"\x27":  {
+            "classname": "SEC",
+
+        },
+    }
+
+    def safeget(self, dict, *keys):
+        '''safe getmethod for nested dicts'''
+        for key in keys:
+            try:
+                dict = dict[key]
+            except KeyError:
+                return None
+        return dict
 
     def add_byte(self, byte):
-        if (byte == b'\x62' and self.last_byte == b'\xB5'):
+        if (self.parse_mode == None and byte == b'\x62' and self.last_byte == b'\xB5'):
             self.parse_mode = "UBX"
             self.data = []
-            print("start UBX")
+            print("received UBX start frame")
             return
         self.last_byte = byte
         if self.parse_mode == "UBX":
             self.data.append(byte)
-            #print(f"append {byte}", f"l: {len(self.data)} ",
-                  #f"data {self.data}")
+            # print(f"append {byte}", f"l: {len(self.data)} ",
+            # f"data {self.data}")
             if (len(self.data) == 4):
                 length = int.from_bytes(
                     self.data[2] + self.data[3], 'little')
-                print(f"length: {length}")
+                #print(f"length: {length}")
                 self.ubx_length = length
             elif (self.ubx_length != None and len(self.data) == (self.ubx_length + 6)):
-                print("received ubx message:", list(self.data))
                 data = b''.join(self.data)
                 #print(f"sync: {self.sync}", f"data {data}",)
                 msg = self.sync+bytes(data)
@@ -110,5 +170,11 @@ class ubx_parser:
                     print(
                         f"wrong checksum {list(checksum)} is not {list(data[-2:])}")
                 else:
-                    print("checksum OK!")
-                self.data =[]
+                    classname = self.safeget(
+                        self.ubx_msg_dict, self.data[0], "classname")
+                    idname = self.safeget(
+                        self.ubx_msg_dict, self.data[0], self.data[1]) or "unknown"
+                print(
+                    f"received ubx message (class:{classname} id:{idname} payload_length: {self.ubx_length})")
+                self.data = []
+                self.parse_mode = None

@@ -8,44 +8,38 @@ Description:
 POC script to communicate with an ublox F9P GNSS receiver.
 """
 
-import serial
+#import serial
+#import numpy as np
 import time
-import numpy as np
+import json 
 
 
-from ubx_helper import ubx_config_helper, ubx_parser
-SERIAL_PORT = "COM6"
-BAUDRATE = 115200
+from ubx_receiver import UBX_receiver, UBX_message, NMEA_message
 
+def serial_gnss(port, baud):
+    receiver = UBX_receiver(port, baud)
+    print("Starting to listen for UBX packets")
+    receiver.ubx_config_disable_all()
+    # receiver.ubx_config_enable("RAWX_UART1","SFRBX_UART1")
+    receiver.ubx_config_enable("GGA_UART1", "RAWX_UART1")
+    try:
+        while True:
+            try:
+                msg = receiver.parse()
+                if (isinstance(msg, str)):
+                    print(f"error: {msg}")
+                elif (isinstance(msg, UBX_message)):
+                    print(msg)
+                elif (isinstance(msg, NMEA_message)):
+                    print(msg)
+            except (ValueError, IOError) as err:
+                print(err)
+            time.sleep(0.01)
 
-ubx = ubx_config_helper()
-parser = ubx_parser()
+    finally:
+        del receiver #clean up serial connection
 
-port = serial.Serial(SERIAL_PORT, BAUDRATE)  # open serial port
-time.sleep(1)
-
-# Turn off all NMEA messages but the GGA message
-print("sending disable msg")
-msg_disable = ubx.ubx_config_disable(
-    "GLL_UART1", "GSV_UART1", "GGA_UART1", "RMC_UART1", "GSA_UART1", "VTG_UART1")
-print(list(msg_disable))
-port.write(msg_disable)
-
-print("sending enable msg")
-msg_enable = ubx.ubx_config_enable("RAWX_UART1")
-print(list(msg_enable))
-port.write(msg_enable)
-
-# ser.write(ubx.ubx_config_disable_all())
-
-print("Starting to listen for UBX packets")
-
-try:
-    while True:
-        try:
-           parser.add_byte(port.read())
-        except (ValueError, IOError) as err:
-            print(err)
-
-finally:
-    port.close()
+if __name__ == "__main__":
+    port = "COM5"
+    baud = 115200
+    serial_gnss(port,baud)

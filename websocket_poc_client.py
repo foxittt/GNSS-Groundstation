@@ -12,11 +12,18 @@ POC websocket client that automatically reconnects and should prevent message lo
 import asyncio
 import websockets
 import datetime
+import json
 import sys
 
 from collections import deque
+from ubx_receiver import UBX_receiver, UBX_message, NMEA_message
+
 DATA = deque()
 SERVER = None
+
+SERIAL_PORT = "COM5"
+BAUDRATE = 115200
+WEBSOCKET_ADDRESS = "ws://localhost:5678"
 
 
 def handle_msg(msg):
@@ -25,6 +32,32 @@ def handle_msg(msg):
 
 
 async def gather_data():
+    receiver = UBX_receiver(SERIAL_PORT, BAUDRATE)
+    try:
+        print("Starting to listen for UBX packets")
+        receiver.ubx_config_disable_all()
+        # receiver.ubx_config_enable("RAWX_UART1","SFRBX_UART1")
+        receiver.ubx_config_enable("GGA_UART1")
+        while True:
+            try:
+                msg = receiver.parse()
+                if (isinstance(msg, str)):
+                    print(f"error: {msg}")
+                elif (isinstance(msg, UBX_message)):
+                    print(msg)
+                    DATA.append(str(msg))
+                elif (isinstance(msg, NMEA_message)):
+                    print(msg)
+                    DATA.append(str(msg))
+            except (ValueError, IOError) as err:
+                print(err)
+            await asyncio.sleep(0)
+
+    finally:
+        del receiver #clean up serial connection
+
+
+async def gather_placeholder_data():
     counter = 0
     print("starting task: gather_data")
     while True:
@@ -66,7 +99,7 @@ async def listen_forever():
         # outer loop restarted every time the connection fails
         SERVER = None
         print("Connecting to websocket server...")
-        connection = websockets.connect("ws://localhost:5678")
+        connection = websockets.connect(WEBSOCKET_ADDRESS)
         try:
             SERVER = await asyncio.wait_for(connection, 5)
         except (OSError, websockets.exceptions.InvalidMessage) as e:
