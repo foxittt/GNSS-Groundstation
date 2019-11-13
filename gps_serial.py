@@ -17,7 +17,11 @@ import json
 from ubx_receiver import UBX_receiver, UBX_message, NMEA_message
 
 def serial_gnss(port, baud):
-    receiver = UBX_receiver(port, baud)
+    try:
+        receiver = UBX_receiver(port, baud)
+    except OSError as err:
+        print(f"Error while opening serial port: {err}")
+        return
     print("Starting to listen for UBX packets")
     receiver.ubx_config_disable_all()
     # receiver.ubx_config_enable("RAWX_UART1","SFRBX_UART1")
@@ -40,6 +44,6 @@ def serial_gnss(port, baud):
         del receiver #clean up serial connection
 
 if __name__ == "__main__":
-    port = "COM5"
+    port = "COM6"
     baud = 115200
     serial_gnss(port,baud)

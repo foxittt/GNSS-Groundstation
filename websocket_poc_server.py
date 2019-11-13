@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Author: 
+Author:
 Marcus Voß (m.voss@laposte.net)
 
 Description:
@@ -9,38 +9,58 @@ POC websocket server that prints every message it receives.
 """
 
 import asyncio
-import websockets
 import json
+import websockets
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 
 CLIENTS = set()
-WEBSOCKET_IP = "localhost"#"10.0.20.227"
+WEBSOCKET_IP = "localhost"  # "10.0.20.227"
 WEBSOCKET_PORT = 5678
+USERNAME = "MVO"
+PASSWORD = "e5W7Avnr6NgUiZ"
+
+
+async def authenticate(username, password):
+    reason = "unknown reason"
+    if username == USERNAME:
+        if password == PASSWORD:
+            return True
+        else:
+            reason = f"wrong password ({password})"
+    else:
+        reason = f"wrong username ({username})"
+    logging.info(f"client refused: {reason}")
+    return False
 
 
 async def register(websocket):
-    print("client connected", websocket)
+    logging.info("client connected {websocket}")
     CLIENTS.add(websocket)
 
 
 async def unregister(websocket):
-    print("client disconnected", websocket)
+    logging.info("client disconnected {websocket}")
     CLIENTS.remove(websocket)
 
 
 async def server(websocket, path):
-    print("websocket:", websocket)
-    print("path:", path)
+    logging.debug("websocket: {websocket}")
+    logging.debug("path: {path}")
     await register(websocket)
     try:
         async for message in websocket:
             msg = json.loads(message)
-            print(f">{message}")
+            logging.info(f">{message}")
             msgID = msg.get("msgID")
             await websocket.send(f"OK {msgID}")
     finally:
         await unregister(websocket)
-print("waiting for clients...")
-start_server = websockets.serve(server, WEBSOCKET_IP, WEBSOCKET_PORT)
+logging.info("waiting for clients...")
+start_server = websockets.serve(server, WEBSOCKET_IP, WEBSOCKET_PORT, create_protocol=websockets.basic_auth_protocol_factory(
+    realm="TUB", check_credentials=authenticate)
+)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()

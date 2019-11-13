@@ -1,4 +1,5 @@
 import serial
+import logging
 
 ubx_msg_dict = {
     # lookup table for ubx messages
@@ -98,34 +99,51 @@ ubx_config_dict = {
 
 
 class UBX_receiver:
+    serialport =  None
+    baudrate = None
     port = None
     current_parse = None
     parse_data = []
     last_byte = None
 
     def __init__(self, port, baudrate):
-        try:
-            self.port = serial.Serial(port, baudrate)  # open serial port
-        except OSError as err:
-            print(f"Error while opening serial port: {err}")
+        self.serialport = port
+        self.baudrate = baudrate
+        self.connect()
+
 
     def __del__(self):
-        self.port.close()
+        if self.port != None:
+            self.port.close()
+
+    def connect(self):
+        if self.port != None:
+            try:
+                self.port.close()
+            except Exception as err:
+                print(f"lol {err}")
+        logging.info(f"connectiong to {self.serialport}:{self.baudrate}")
+        self.port = serial.Serial(self.serialport, self.baudrate)  # open serial port
+
+    def reset_data(self):
+        self.parse_data = []
+        self.current_parse = None
 
     def parse(self):
+       
         if (self.port.in_waiting > 0):#non blocking read
-            #print(f"mode: {self.current_parse} data {self.parse_data}")
+            logging.debug(f"mode: {self.current_parse} data {self.parse_data}")
             byte = self.port.read() 
-            #print(f"byte: {byte} lastbyte: {self.last_byte}")
+            logging.debug(f"byte: {byte} lastbyte: {self.last_byte}")
             if (self.current_parse == None):
                 if (byte == b'\x62' and self.last_byte == b'\xB5'):
                     self.current_parse = "UBX"
                     self.parse_data = []
-                    #print("received UBX start frame")
+                    logging.debug("received UBX start frame")
                 elif (byte == b'G' and self.last_byte == b'$'):
                     self.current_parse = "NMEA"
                     self.parse_data = [b'G']
-                    #print("received NMEA start frame")
+                    logging.debug("received NMEA start frame")
                 self.last_byte = byte
                 return
 
@@ -139,10 +157,9 @@ class UBX_receiver:
                         data_string = b''.join(self.parse_data)
                         try:
                             message = UBX_message(data_string)
-                        except ValueError:
-                            message = "invalid ubx-message!"
-                        self.parse_data = []
-                        self.current_parse = None
+                        except ValueError as err:
+                            message = f"invalid ubx-message! ({err})"
+                        self.reset_data()
                         return message
 
             if (self.current_parse == "NMEA"):
@@ -153,9 +170,10 @@ class UBX_receiver:
                         message = NMEA_message(data_string)
                     except ValueError:
                         message = "invalid nmea-message!"
-                    self.parse_data = []
-                    self.current_parse = None
+                    self.reset_data()
                     return message
+        
+
 
     def ubx_msg(self, c, id, payload):
         '''generate a valid ubx message with checksum'''
@@ -236,7 +254,7 @@ class UBX_message:
             self.length = int.from_bytes(data[2:3], 'little')
             self.payload = data[4:-2]
             if (len(self.payload) != self.length):
-                raise ValueError("payload legths is incorrect")
+                raise ValueError(f"payload legths is incorrect ({len(self.payload)} != {self.length})")
 
     def __str__(self):
         classname = safeget(ubx_msg_dict, bytes(
