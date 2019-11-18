@@ -12,11 +12,11 @@ import asyncio
 import json
 import websockets
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 CLIENTS = set()
-WEBSOCKET_IP = "localhost"  # "10.0.20.227"
+WEBSOCKET_IP = "127.0.0.1"  # "10.0.20.227"
 WEBSOCKET_PORT = 5678
 USERNAME = "MVO"
 PASSWORD = "e5W7Avnr6NgUiZ"
@@ -52,8 +52,9 @@ async def server(websocket, path):
     try:
         async for message in websocket:
             msg = json.loads(message)
-            logging.info(f">{message}")
+            uuid = websocket.request_headers["uuid"] or "unknown"
             msgID = msg.get("msgID")
+            logging.info(f"{uuid}> {msgID}")
             await websocket.send(f"OK {msgID}")
     finally:
         await unregister(websocket)
