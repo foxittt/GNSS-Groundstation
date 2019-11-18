@@ -22,12 +22,12 @@ logging.getLogger('asyncio').setLevel(logging.WARNING)
 logging.getLogger('websockets').setLevel(logging.WARNING)
 
 from collections import deque
-from ubx_receiver import UBX_receiver, UBX_message, NMEA_message
+from ubxReceiver.ubx_receiver import UBX_receiver, UBX_message, NMEA_message
 
 DATA = deque()
 SERVER = None
 
-SERIAL_PORT = "COM6"
+SERIAL_PORT = "COM3"
 BAUDRATE = 115200
 USERNAME = "MVO"
 PASSWORD = "e5W7Avnr6NgUiZ"
@@ -152,12 +152,11 @@ async def listen_forever():
             # listener loop
             if len(DATA) > 0 and SERVER != None:
                 try:
-                    #logging.debug(f"queque length: {len(DATA)}")
                     msg = json.dumps(DATA[0])  # get leftmost item
-                    #print(f"< {msg}")
+                    logging.debug(f"> {msg}")
                     await SERVER.send(msg)
                     answ = await SERVER.recv()
-                    logging.info(f"> {answ}")
+                    logging.info(f"< {answ}")
                     DATA.popleft()
                 except websockets.exceptions.ConnectionClosed:
                     logging.error("websocket connection lost")
